@@ -1,7 +1,6 @@
-version: '2.29'
+version: '3.8'
 
 services:
-
   database:
     container_name: cognito-db
     image: postgres:12
@@ -14,5 +13,28 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
 
+  app:
+    container_name: cognito-app
+    build:
+      context: .  # Diretório onde está o Dockerfile
+      dockerfile: Dockerfile
+    environment:
+      DB_HOST: database
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASSWORD: 1234
+      DB_NAME: postgres
+      AWS_COGNITO_POOL_ID: <AWS_COGNITO_POOL_ID>
+      AWS_COGNITO_CLIENT_ID: <AWS_COGNITO_CLIENT_ID>
+      COGNITO_REGION: <COGNITO_REGION>
+      JWT_SECRET: <JWT_SECRET>
+    ports:
+      - "3000:3000"
+    depends_on:
+      - database
+    volumes:
+      - .:/usr/src/app
+      - /usr/src/app/node_modules
+
 volumes:
-  pgdata: {}
+  pgdata:
