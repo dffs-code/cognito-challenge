@@ -5,6 +5,9 @@ export class User {
   @PrimaryGeneratedColumn()
   id: number;
 
+  @Column()
+  name: string;
+
   @Column({ unique: true })
   email: string;
 
@@ -13,6 +16,9 @@ export class User {
 
   @Column()
   cognitoId: string;
+
+  @Column()
+  isOnboarded: boolean;
 
   @Column({
     type: 'enum',

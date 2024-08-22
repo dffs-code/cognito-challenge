@@ -1,5 +1,5 @@
 import { Context } from "koa";
-import { signIn, signUp } from "../config/cognito";
+import { confirmSignUp, signIn, signUp } from "../config/cognito";
 import { User } from "../entities/user.entity";
 import * as bcrypt from "bcryptjs";
 import { AppDataSource } from "../data-source";
@@ -8,7 +8,7 @@ import 'dotenv/config'
 
 export const userController = {
   async auth(ctx: Context): Promise<any> {
-    const { password, email } = ctx.request.body;
+    const { name, password, email } = ctx.request.body;
     const userRepository = AppDataSource.getRepository(User);
 
     try {
@@ -17,7 +17,7 @@ export const userController = {
 
       if (user) {
         const signInResult = await signIn(email, password);
-        const token = jwt.sign({userId: user.cognitoId}, process.env.JWT_SECRET!, { expiresIn: signInResult.AuthenticationResult?.ExpiresIn})
+        const token = jwt.sign({userId: user.cognitoId, role: user.role}, process.env.JWT_SECRET!, { expiresIn: signInResult.AuthenticationResult?.ExpiresIn})
         ctx.body = { token };
       } else {
         const hashedPassword = await bcrypt.hash(password, 10);
@@ -27,9 +27,11 @@ export const userController = {
         console.log(signUpResult)
 
         user = new User();
+        user.name = name;
         user.email = email;
         user.password = hashedPassword;
         user.cognitoId = signUpResult.UserSub;
+        user.isOnboarded = false;
 
         await userRepository.save(user).then(()=>{
           ctx.body = {
@@ -48,7 +50,7 @@ export const userController = {
   async editAccount(ctx: Context): Promise<any> {
     const userRepository = AppDataSource.getRepository(User);
     const userId = ctx.state.user.sub;
-    const { email, password, role } = ctx.request.body;
+    const { name, email, password, role } = ctx.request.body;
 
     const user = await userRepository.findOneBy({ id: userId });
 
@@ -58,17 +60,20 @@ export const userController = {
       return;
     }
 
+    if (name) user.name = name;
     if (email) user.email = email;
     if (password) user.password = await bcrypt.hash(password, 10);
-    if (ctx.state.user["cognito:groups"]?.includes("admin") && role)
+    if (ctx.state.user.role === 'admin' && role)
       user.role = role;
+
+    user.isOnboarded = true;
 
     await userRepository.save(user);
     ctx.body = user;
   },
 
   async allUsers(ctx: Context): Promise<any> {
-    if (!ctx.state.user["cognito:groups"]?.includes("admin")) {
+    if (ctx.state.user.role !== 'admin') {
       ctx.status = 403;
       ctx.body = "Acesso negado";
       return;
@@ -109,5 +114,20 @@ export const userController = {
     ctx.body = 'Erro interno do servidor';
     console.error(error);
   }
+  },
+
+  async confirm(ctx: Context): Promise<any> {
+    const { email, confirmationCode } = ctx.request.body;
+
+    try {
+      const data = await confirmSignUp(email, confirmationCode);
+      ctx.body = {
+        message: "User confirmed successfully",
+        result: data,
+      };
+    } catch (error) {
+      ctx.status = 500;
+      ctx.body = { message: "An error occurred", error };
+    }
   }
 };

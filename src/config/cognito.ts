@@ -24,3 +24,11 @@ export const signIn = (email: string, password: string) => {
     }
   }).promise();
 };
+
+export const confirmSignUp = (email: string, confirmationCode: string) => {
+  return cognito.confirmSignUp({
+    ClientId: process.env.COGNITO_CLIENT_ID!,
+    Username: email,
+    ConfirmationCode: confirmationCode
+  }).promise();
+}
